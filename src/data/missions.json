@@ -1,0 +1,18 @@
+{
+  "ARBot-HMO": {
+    "map": "parque_madero",
+    "goals": {
+      "plantas": 8,
+      "riegos": 2
+    },
+    "timer": 480
+  },
+  "Recicla-Planta": {
+    "map": "centro_hist",
+    "goals": {
+      "checkpoints": 3,
+      "precision": 0.85
+    },
+    "timer": 600
+  }
+}

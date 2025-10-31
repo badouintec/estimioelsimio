@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estimio el Simio - Prototipo Visual</title>
+    <!-- Cargar p5.js y p5.sound --><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
+    
+    <style>
+        body {
+            background-color: #2B2B2B; /* Carbón (Paleta base) */
+            color: #F0F0F0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        main {
+            max-width: 100%;
+            max-height: 100vh;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            /* Importante para que el canvas tenga el tamaño correcto */
+            width: 960px; 
+            height: 540px;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <main id="canvas-container"></main>
+
+    <script>
+        // -----------------------------------------------------------------
+        // Estimio el Simio - Prototipo Visual Mejorado
+        // -----------------------------------------------------------------
+
+        let state = 'PLAY'; 
+        let mission = '¡Recolecta la Chatarra!'; 
+
+        // Paleta de colores
+        const palette = {
+            arena: '#D9C9A3',     // Para el cielo cálido o elementos claros del desierto
+            carbon: '#2B2B2B',    // Para texto, sombras profundas, detalles
+            cobre: '#B87333',     // Para elementos especiales, interfaz resaltada
+            verde: '#4C9A2A',     // Para vegetación, elementos positivos
+            azul: '#8AB7FF',      // Para agua, cielo más frío, vidrio
+            bata: '#F0F0F0',      // Blanco de la bata de Estimio
+            bataSombra: '#D0D0D0',// Sombra de la bata
+            pielArena: '#F2D7B6', // Tono claro de la piel de Estimio
+            pielSombra: '#D9C9A3',// Tono de sombra de la piel de Estimio
+            peloMarron: '#5D3A1B',// Pelo oscuro de Estimio
+            peloLuz: '#8B572A',   // Pelo iluminado de Estimio
+            metal: '#A0A0A0',     // Metal genérico, chatarra
+            metalSombra: '#707070',// Sombra del metal
+            lente: '#CAF0F8',     // Color de las lentes de los goggles
+            cieloMedio: '#A8DDF7', // Un tono de cielo intermedio
+            cieloLejano: '#D1EBF7', // Un tono de cielo más lejano/claro
+            montanaLejana: '#6B8796', // Color de montañas lejanas
+            montanaCercana: '#4F6C7A' // Color de montañas cercanas
+        };
+
+        // Entidades del juego
+        let player;
+        let collectibles = [];
+        let score = 0;
+        const totalCollectibles = 5;
+        let gravity;
+        let floorY; // Posición Y del suelo
+        let platforms = []; // Array para las plataformas
+
+        // Sprite de Estimio pre-renderizado en un buffer
+        let estimioBuffer; 
+
+        function setup() {
+            let container = document.getElementById('canvas-container');
+            createCanvas(960, 540).parent(container);
+            noSmooth(); // Para el pixel-art
+
+            // Crear el sprite de Estimio una sola vez al inicio
+            estimioBuffer = createGraphics(80, 96); // Tamaño base para el pixel-art original
+            createEstimioSprite(estimioBuffer);
+            
+            // Configuración de la física
+            gravity = createVector(0, 0.5);
+            floorY = height - 50; // El suelo está 50px desde abajo
+
+            // --- Definir plataformas (ahora más alcanzables y con un flujo lógico) ---
+            platforms = [
+                { x: 100, y: floorY - 60, w: 120, h: 20 },  // Plataforma inicial
+                { x: 300, y: floorY - 120, w: 150, h: 20 }, // Primera plataforma elevada
+                { x: 550, y: floorY - 180, w: 180, h: 20 }, // Segunda plataforma más alta
+                { x: 780, y: floorY - 120, w: 100, h: 20 }, // Plataforma de retorno/final
+                { x: 400, y: floorY - 250, w: 100, h: 20 }  // Plataforma superior
+            ];
+
+            // Crear jugador
+            player = {
+                pos: createVector(50, floorY - 48), // Posición inicial del jugador
+                vel: createVector(0, 0),
+                size: createVector(32, 48), // Tamaño de Estimio según GDD
+                speed: 4,
+                jumpForce: 10,
+                onGround: false,
+                facingRight: true, // Dirección a la que mira el personaje
+                
+                applyForce: function(force) {
+                    this.vel.add(force);
+                },
+                
+                update: function() {
+                    // Movimiento horizontal (A/D o flechas)
+                    if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) { // A
+                        this.pos.x -= this.speed;
+                        this.facingRight = false;
+                    }
+                    if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) { // D
+                        this.pos.x += this.speed;
+                        this.facingRight = true;
+                    }
+                    
+                    // Aplicar gravedad
+                    this.applyForce(gravity);
+                    // Aplicar velocidad Y
+                    this.pos.y += this.vel.y;
+                    
+                    // Fricción (horizontal)
+                    this.vel.x *= 0.85; 
+                    
+                    // Variable para saber si estamos en CUALQUIER suelo (plataforma o piso)
+                    let onAnyGround = false;
+
+                    // --- Colisión Vertical (Plataformas) ---
+                    // Solo checar si estamos cayendo (vel.y >= 0)
+                    if (this.vel.y >= 0) {
+                        for (let p of platforms) {
+                            let playerRight = this.pos.x + this.size.x;
+                            let playerLeft = this.pos.x;
+                            let platformRight = p.x + p.w;
+                            let platformLeft = p.x;
+
+                            // ¿Estamos horizontalmente alineados?
+                            if (playerRight > platformLeft && playerLeft < platformRight) {
+                                let playerBottom = this.pos.y + this.size.y;
+                                // Posición anterior del jugador
+                                let prevBottom = (this.pos.y - this.vel.y) + this.size.y;
+                                let platformTop = p.y;
+                                
+                                // ¿Estábamos *antes* por encima y *ahora* estamos por debajo?
+                                if (playerBottom >= platformTop && prevBottom <= platformTop) {
+                                    this.pos.y = platformTop - this.size.y; // Aterrizar
+                                    this.vel.y = 0;
+                                    onAnyGround = true;
+                                    break; // Solo puede estar en una plataforma a la vez
+                                }
+                            }
+                        }
+                    }
+                    
+                    // --- Colisión Vertical (Suelo) ---
+                    // Si no hemos aterrizado en una plataforma, checar el suelo
+                    if (!onAnyGround && this.pos.y + this.size.y > floorY) {
+                        this.pos.y = floorY - this.size.y;
+                        this.vel.y = 0;
+                        onAnyGround = true;
+                    }
+
+                    // Actualizar estado 'onGround'
+                    this.onGround = onAnyGround;
+                    
+                    // Aplicar velocidad X (después de colisiones Y)
+                    this.pos.x += this.vel.x;
+
+                    // Limitar al canvas (horizontal)
+                    this.pos.x = constrain(this.pos.x, 0, width - this.size.x);
+                },
+                
+                draw: function() {
+                    push();
+                    translate(this.pos.x, this.pos.y);
+                    
+                    // Voltear el sprite si mira a la izquierda
+                    if (!this.facingRight) {
+                        scale(-1, 1);
+                        translate(-this.size.x, 0); // Ajustar la posición después de voltear
+                    }
+                    
+                    // Dibujar Estimio desde el buffer. Escalarlo para que se vea del tamaño correcto.
+                    // El buffer original es 80x96, pero el personaje es 32x48 de "espacio de juego".
+                    // Esto significa que necesitamos ajustar la escala de dibujo del buffer para
+                    // que Estimio dentro del buffer de 80x96 se vea del tamaño 32x48 en el juego.
+                    // Aquí, el sprite tiene un margen, por lo que se ajusta el offset para centrarlo visualmente.
+                    let spriteScale = 0.4; // Ajuste manual para que el sprite se vea a 32x48 efectivos.
+                    image(estimioBuffer, -24, -20, estimioBuffer.width * spriteScale, estimioBuffer.height * spriteScale); // Ajuste visual
+
+                    pop();
+                },
+                
+                jump: function() {
+                    if (this.onGround) {
+                        this.vel.y = -this.jumpForce;
+                        // TODO: Sonido de salto
+                    }
+                },
+
+                // Colisión Rectángulo-Círculo (para jugador con ítems)
+                collidesWith: function(item) {
+                    return collideRectCircle(
+                        this.pos.x, this.pos.y, this.size.x, this.size.y,
+                        item.x, item.y, item.size
+                    );
+                }
+            };
+            
+            // Crear coleccionables (chatarra)
+            const collectiblePositions = [
+                { x: 180, y: floorY - 60 - 20 }, // Plataforma inicial
+                { x: 380, y: floorY - 120 - 20 }, // Primera plataforma elevada
+                { x: 650, y: floorY - 180 - 20 }, // Segunda plataforma más alta
+                { x: 800, y: floorY - 120 - 20 }, // Plataforma de retorno/final
+                { x: 450, y: floorY - 250 - 20 } // Plataforma superior
+            ];
+
+            for (let pos of collectiblePositions) {
+                collectibles.push({
+                    x: pos.x,
+                    y: pos.y,
+                    size: 24, // Tamaño visual de la chatarra
+                    collected: false
+                });
+            }
+            
+            initAudio(); // TODO: implementar con p5.sound o Tone.js
+        }
+
+        function draw() {
+            if (state === 'PLAY') {
+                drawGame();
+            }
+        }
+
+        function keyPressed() {
+            if (state === 'PLAY') {
+                if (key === ' ' || keyCode === UP_ARROW) {
+                    player.jump();
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // Lógica del Juego (Estado PLAY)
+        // -----------------------------------------------------------------
+
+        function drawGame() {
+            // --- Fondo (Cielo y Horizonte) ---
+            drawBackground();
+            
+            // Dibujar suelo
+            push();
+            fill(palette.peloMarron); // Color tierra
+            noStroke();
+            rect(0, floorY, width, height - floorY);
+            // Detalles del suelo (dithering simple o más textura)
+            fill(palette.peloLuz);
+            for(let i = 0; i < width; i += 8) {
+                rect(i, floorY + 4, 4, 2);
+                rect(i+2, floorY + 8, 2, 4);
+            }
+            pop();
+            
+            // --- Dibujar Plataformas ---
+            push();
+            fill(palette.peloMarron); // Mismo color que el suelo
+            stroke(palette.peloLuz);  // Borde más claro
+            strokeWeight(2);
+            for (let p of platforms) {
+                rect(p.x, p.y, p.w, p.h, 4); // Con esquinas redondeadas
+            }
+            pop();
+
+            // Actualizar y dibujar jugador
+            player.update();
+            player.draw();
+            
+            // Dibujar y checar coleccionables
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                let item = collectibles[i];
+                if (item.collected) {
+                    continue; 
+                }
+                
+                // Dibujar chatarra (forma más definida)
+                push();
+                fill(palette.metal); 
+                stroke(palette.metalSombra);
+                strokeWeight(2);
+                // Forma de tuerca/engranaje simple o trozo de metal irregular
+                rect(item.x - item.size/3, item.y - item.size/3, item.size * 2/3, item.size * 2/3); // Cuadrado base
+                ellipse(item.x, item.y, item.size / 2); // Círculo central
+                pop();
+                
+                // Checar colisión
+                if (player.collidesWith(item)) {
+                    item.collected = true;
+                    score++;
+                    // TODO: Sonido de recolección
+                }
+            }
+            
+            // Dibujar HUD
+            drawHUD();
+
+            // Condición de victoria
+            if (score >= totalCollectibles) {
+                drawWinMessage();
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // Fondo Pixel-Artizado
+        // -----------------------------------------------------------------
+        function drawBackground() {
+            // Cielo degradado (o de dos tonos)
+            for (let y = 0; y < height - floorY; y++) {
+                let inter = map(y, 0, height - floorY, 0, 1);
+                let c = lerpColor(color(palette.cieloMedio), color(palette.cieloLejano), inter);
+                stroke(c);
+                line(0, y, width, y);
+            }
+            
+            // Nubes simples (ejemplo)
+            push();
+            noStroke();
+            fill(255, 255, 255, 180); // Nubes blancas semitransparentes
+            ellipse(150, 80, 100, 40);
+            ellipse(200, 90, 80, 30);
+            ellipse(700, 120, 120, 50);
+            ellipse(780, 100, 90, 40);
+            pop();
+
+            // Montañas lejanas
+            push();
+            fill(palette.montanaLejana);
+            noStroke();
+            beginShape();
+            vertex(0, floorY - 150);
+            vertex(width * 0.2, floorY - 250);
+            vertex(width * 0.4, floorY - 180);
+            vertex(width * 0.6, floorY - 280);
+            vertex(width * 0.8, floorY - 200);
+            vertex(width, floorY - 100);
+            vertex(width, floorY);
+            vertex(0, floorY);
+            endShape(CLOSE);
+            
+            // Montañas más cercanas (con una pequeña sombra o color diferente)
+            fill(palette.montanaCercana);
+            beginShape();
+            vertex(0, floorY - 80);
+            vertex(width * 0.15, floorY - 160);
+            vertex(width * 0.35, floorY - 100);
+            vertex(width * 0.5, floorY - 200);
+            vertex(width * 0.7, floorY - 140);
+            vertex(width * 0.9, floorY - 180);
+            vertex(width, floorY - 90);
+            vertex(width, floorY);
+            vertex(0, floorY);
+            endShape(CLOSE);
+            pop();
+        }
+
+
+        // -----------------------------------------------------------------
+        // Elementos de UI
+        // -----------------------------------------------------------------
+
+        function drawHUD() {
+            push();
+            fill(palette.carbon);
+            textSize(28); // Tamaño más grande para el HUD
+            textAlign(LEFT, TOP);
+            text(mission, 20, 20);
+            fill(palette.bata); // Para la información importante
+            text(`Chatarra: ${score} / ${totalCollectibles}`, 20, 60);
+            pop();
+        }
+
+        function drawWinMessage() {
+            push();
+            fill(0, 0, 0, 200); // Fondo más oscuro
+            rect(0, 0, width, height);
+            
+            fill(palette.cobre); // Color de victoria
+            textSize(56);
+            textAlign(CENTER, CENTER);
+            text("¡Misión Completada!", width / 2, height / 2 - 40);
+            
+            fill(palette.bata);
+            textSize(32);
+            text("¡Estimio ha recolectado toda la chatarra!", width / 2, height / 2 + 30);
+            
+            textSize(20);
+            fill(palette.arena);
+            text("¡Gracias por ayudar a Estimio!", width / 2, height / 2 + 80);
+
+            pop();
+            noLoop(); // Detener el juego
+        }
+
+        // -----------------------------------------------------------------
+        // Utilidades (Colisión y Sprite)
+        // -----------------------------------------------------------------
+        
+        // Función de colisión Rectángulo-Círculo (para no necesitar p5.collide2D)
+        function collideRectCircle(rx, ry, rw, rh, cx, cy, diameter) {
+            // Encuentra el punto más cercano en el rectángulo al centro del círculo
+            let testX = cx;
+            let testY = cy;
+            if (cx < rx) testX = rx;
+            else if (cx > rx + rw) testX = rx + rw;
+            if (cy < ry) testY = ry;
+            else if (cy > ry + rh) testY = ry + rh;
+
+            // Calcula la distancia entre el punto más cercano y el centro del círculo
+            let distance = dist(cx, cy, testX, testY);
+
+            // Si la distancia es menor que el radio del círculo, hay colisión
+            return distance <= diameter / 2;
+        }
+
+        /**
+         * Dibuja el sprite de Estimio pixel por pixel en el búfer gráfico.
+         * Basado en la imagen de referencia y la paleta del GDD.
+         * (Esto es una representación artística basada en la imagen)
+         */
+        function createEstimioSprite(pg) {
+            pg.noStroke();
+            pg.push();
+
+            // Función helper para dibujar un "píxel" (rect 1x1)
+            const p = (x, y, col) => {
+                pg.fill(col);
+                pg.rect(x, y, 1, 1);
+            };
+
+            // Dibujar en capas, de atrás hacia adelante
+            
+            // --- Bata (Base) ---
+            for (let y = 30; y < 80; y++) {
+                for (let x = 18; x < 62; x++) {
+                    if (y < 35 && (x < 25 || x > 55)) continue; 
+                    p(x, y, palette.bata);
+                }
+            }
+            // Sombra bata
+            for (let x = 25; x < 55; x++) p(x, 34, palette.bataSombra);
+            for (let y = 35; y < 75; y++) p(25, y, palette.bataSombra);
+            for (let y = 45; y < 70; y++) p(54, y, palette.bataSombra);
+            // --- Cabeza (Pelo) ---
+            for (let y = 10; y < 38; y++) {
+                for (let x = 25; x < 55; x++) { p(x, y, palette.peloMarron); }
+            }
+            // Orejas
+            for (let y = 15; y < 28; y++) {
+                for (let x = 20; x < 26; x++) p(x, y, palette.peloMarron);
+                for (let x = 54; x < 60; x++) p(x, y, palette.peloMarron);
+            }
+            // Pelo luz
+            for (let y = 10; y < 15; y++) {
+                for (let x = 30; x < 50; x++) p(x, y, palette.peloLuz);
+            }
+            // --- Cabeza (Piel) ---
+            for (let y = 20; y < 35; y++) {
+                for (let x = 30; x < 50; x++) { p(x, y, palette.pielArena); }
+            }
+            // Interior orejas
+            for (let y = 18; y < 25; y++) {
+                p(22, y, palette.pielArena); p(23, y, palette.pielArena);
+                p(56, y, palette.pielArena); p(57, y, palette.pielArena);
+            }
+            // --- Ojos y Nariz ---
+            p(34, 24, palette.carbon); p(35, 24, palette.carbon);
+            p(44, 24, palette.carbon); p(45, 24, palette.carbon);
+            p(39, 28, palette.carbon); p(40, 28, palette.carbon);
+            for(let x=35; x<45; x++) p(x, 32, palette.peloMarron);
+            // --- Goggles (lentes) ---
+            for (let y = 5; y < 15; y++) {
+                for (let x = 20; x < 35; x++) p(x, y, palette.metal);
+                for (let x = 45; x < 60; x++) p(x, y, palette.metal);
+            }
+            for (let y = 7; y < 13; y++) {
+                for (let x = 22; x < 33; x++) p(x, y, palette.lente);
+                for (let x = 47; x < 58; x++) p(x, y, palette.lente);
+            }
+            for (let y = 8; y < 12; y++) {
+                for (let x = 35; x < 45; x++) p(x, y, palette.carbon);
+            }
+            // --- Cinturón de Herramientas ---
+            for (let y = 48; y < 55; y++) {
+                for (let x = 22; x < 58; x++) p(x, y, palette.cobre);
+            }
+            for (let y = 55; y < 65; y++) {
+                for (let x = 20; x < 30; x++) p(x, y, palette.cobre);
+                for (let x = 50; x < 60; x++) p(x, y, palette.cobre);
+            }
+            for (let y = 50; y < 53; y++) {
+                for (let x = 38; x < 42; x++) p(x, y, palette.metal);
+            }
+            // --- Herramienta (Mano izq) ---
+            for (let y = 60; y < 75; y++) p(15, y, palette.metal);
+            for (let y = 65; y < 70; y++) {
+                for (let x = 10; x < 15; x++) p(x, y, palette.metal);
+                for (let x = 17; x < 22; x++) p(x, y, palette.metal);
+            }
+            // --- Mano (Piel) ---
+            for (let y = 62; y < 72; y++) {
+                for (let x = 18; x < 25; x++) p(x, y, palette.pielArena);
+            }
+            // --- Texto "CITIAM LABS" ---
+            p(30, 40, palette.carbon); p(32, 40, palette.carbon);
+            p(34, 40, palette.carbon);
+            p(36, 40, palette.carbon); p(38, 40, palette.carbon);
+            pg.pop();
+        }
+
+
+        // -----------------------------------------------------------------
+        // Audio (Stubs)
+        // -----------------------------------------------------------------
+
+        function initAudio() {
+            console.log("Sistema de audio inicializado (stub)");
+            // TODO: Crear osciladores, ruidos y envolventes con p5.sound o Tone.js
+            // TODO: Cargar y reproducir música de fondo en bucle
+        }
+
+        function windowResized() {
+            // El canvas es de tamaño fijo 960x540 en este prototipo.
+            // Para un juego responsivo, aquí se recalcularía el tamaño del canvas.
+        }
+    </script>
+</body>
+</html>
+

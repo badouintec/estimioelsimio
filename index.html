@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Estimio - Misión Frugal: Juego educativo sobre innovación frugal y reciclaje en Hermosillo">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Estimio — Misión Frugal</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+    }
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+    canvas {
+      border: 2px solid #4c9a2a;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="game-container"></div>
+  </main>
+  
+  <!-- p5.js desde CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
+  
+  <!-- Sprite data original -->
+  <script src="estimio_rle_p5.js?v=5"></script>
+  
+  <!-- Sistema de render -->
+  <script src="src/render/sprite.js?v=5"></script>
+  
+  <!-- Código principal -->
+  <script src="src/main.js?v=7"></script>
+  
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('Service Worker registrado'))
+        .catch(err => console.error('Error SW:', err));
+    }
+  </script>
+</body>
+</html>

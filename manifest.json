@@ -1,0 +1,26 @@
+{
+  "name": "Estimio - Misión Frugal",
+  "short_name": "Estimio",
+  "description": "Juego educativo sobre innovación frugal, reciclaje y especies nativas en Hermosillo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#4c9a2a",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "games"],
+  "lang": "es-MX"
+}

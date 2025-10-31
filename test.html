@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Test Simple</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+</head>
+<body style="margin:0; background:#222; display:flex; justify-content:center; align-items:center; height:100vh;">
+  <script>
+    function setup() {
+      createCanvas(960, 540);
+      console.log('Setup ejecutado');
+    }
+    
+    function draw() {
+      background(100, 150, 200);
+      fill(255);
+      textSize(32);
+      textAlign(CENTER, CENTER);
+      text('P5.JS FUNCIONA!', width/2, height/2);
+      
+      fill(255, 0, 0);
+      ellipse(mouseX, mouseY, 50, 50);
+    }
+  </script>
+</body>
+</html>

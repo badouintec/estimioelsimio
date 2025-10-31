@@ -1,0 +1,21 @@
+{
+  "ARBot-HMO": {
+    "req": {
+      "chatarra": { "qty": 12, "min": "B" },
+      "electronica": { "qty": 6, "min": "B" },
+      "plastico": { "qty": 8, "min": "C" },
+      "bateria": { "qty": 1, "min": "A" },
+      "semillas": { "qty": 10, "min": "C" }
+    },
+    "bonos": ["durabilidad", "eficiencia"]
+  },
+  "Recicla-Planta": {
+    "req": {
+      "chatarra": { "qty": 10, "min": "B" },
+      "plastico": { "qty": 10, "min": "B" },
+      "electronica": { "qty": 8, "min": "B" },
+      "celda_solar": { "qty": 1, "min": "A" }
+    },
+    "bonos": ["rango", "ahorro_energia"]
+  }
+}
